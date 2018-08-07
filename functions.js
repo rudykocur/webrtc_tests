@@ -402,6 +402,7 @@ class VideoStreamFeed {
     }
 
     start() {
+        console.log('Starting video feed with resolution', 1920, 'x', 1080);
         this.findDeviceId().then(deviceId => {
             const constraints = {
                 audio: false,
