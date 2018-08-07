@@ -48,26 +48,59 @@
     }
 
     function run(videoElement) {
+        
+
         const canvas = document.querySelector('#canvasOutput');
         const videoCanvas = document.createElement('canvas');
+        // videoCanvas.style.width = "640px";
+        // videoCanvas.style.height = "480px";
+        document.body.appendChild(videoCanvas);
+
+        navigator.mediaDevices.enumerateDevices()
+        .then(function(devices) {
+            devices = devices.filter(d => d.kind === "videoinput");
+
+            document.body.appendChild(document.createTextNode(JSON.stringify(devices)));
+            
+            let deviceId;
+            
+            if(devices.length > 1) {
+                deviceId= devices[1].deviceId;
+            }
+            else {
+                deviceId = devices[0].deviceId;
+            }
+
+            document.body.appendChild(document.createTextNode(deviceId));
+
+            startCapture(deviceId);
+        });
 
         
 
         function processVideo(video) {
+            
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            //console.log('PAINTING', canvas.width, '::', canvas.height);
-            videoCanvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+            console.log('PAINTING', canvas.width, '::', canvas.height);
+
+if(video.videoWidth == 0 || video.videoHeight == 0) {
+                return;
+            }
+
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
 
 
-            let orig = cv.imread(videoCanvas);
+            let orig = cv.imread(canvas);
             let src = new cv.Mat();
 
             let SCALE = 1.0;
             let MIN_AREA = 2000;
-            
 
-            cv.resize(orig, src, new cv.Size(0,0), 1/SCALE, 1/SCALE, cv.INTER_AREA);
+            // console.log(orig.size());
+            
+            orig.copyTo(src);
+            // cv.resize(orig, src, new cv.Size(0,0), 1/SCALE, 1/SCALE, cv.INTER_AREA);
             let overlay = cv.Mat.ones(src.rows, src.cols, cv.CV_8UC3);
 
             // let overlay = cv.Mat.ones(src.rows, src.cols, cv.CV_8UC3);
@@ -85,30 +118,36 @@
              cv.imshow('canvasOutputOverlay', overlay);
 
         }
+        
 
+        function startCapture(deviceId) {
 
-        const constraints = {
-            audio: false,
-            video: true
-        };
+            const constraints = {
+                audio: false,
+                video: {
+                    deviceId: deviceId
+                }
+            };
 
-        function pollVideoStream() {
-            processVideo(videoElement);
-            setTimeout(() => pollVideoStream(), 250);
+            function pollVideoStream() {
+                processVideo(videoElement);
+                setTimeout(() => pollVideoStream(), 250);
+            }
+
+            function handleSuccess(stream) {
+                console.log('Starting stream with', deviceId);
+            // window.stream = stream; // make stream available to browser console
+                videoElement.srcObject = stream;
+
+                pollVideoStream();
+            }
+
+            function handleError(error) {
+            console.log('navigator.getUserMedia error: ', error);
+            }
+
+            navigator.mediaDevices.getUserMedia(constraints).then(handleSuccess).catch(handleError);
         }
-
-        function handleSuccess(stream) {
-        // window.stream = stream; // make stream available to browser console
-            videoElement.srcObject = stream;
-
-            pollVideoStream();
-        }
-
-        function handleError(error) {
-        console.log('navigator.getUserMedia error: ', error);
-        }
-
-        navigator.mediaDevices.getUserMedia(constraints).then(handleSuccess).catch(handleError);
     }
 
 
