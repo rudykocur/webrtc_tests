@@ -11,6 +11,7 @@ function getImportantContours(src, minArea) {
 
         let cnt = contours.get(i);
         let cntArea = cv.contourArea(cnt);
+        let cntBbox = cv.boundingRect(cnt);
 
         if(cntArea < minArea) {
             continue;
@@ -24,6 +25,7 @@ function getImportantContours(src, minArea) {
             index: i,
             mat: cnt,
             area: cntArea,
+            bbox: cntBbox,
             center: {x: cX, y: cY}
         });
     }
@@ -37,7 +39,7 @@ function cutContours(src, contours, upscale) {
     return contours.map(cnt => {
         let hullBB = cv.boundingRect(cnt.mat);
 
-        console.log('HULL BB', hullBB)
+        console.log('HULL BB', hullBB);
 
         let cutRect = new cv.Rect(
           hullBB.x * SCALE, hullBB.y * SCALE,
@@ -175,11 +177,13 @@ function cutTilesFromClusters(src, clusters, invertColors) {
 }
 
 function findContourAndFixPerspective(src) {
-    let important = getImportantContours(src, 1000);
+    let important = getImportantContours(src, 2000);
 
     important.sort((a, b) => b.area-a.area);
     let biggest = important[0];
     let bbox = cv.boundingRect(biggest.mat);
+
+    drawBBRect(src, bbox, new cv.Scalar(0,0,0));
 
     let corners = getContourBBCorners(biggest.mat);
 
@@ -330,4 +334,137 @@ function flatten(src, corners, bbox, desiredHeight) {
   cv.warpPerspective(src, dst, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
 
   return dst;
+}
+
+class EventEmitter {
+    constructor() {
+        this._listeners = [];
+    }
+
+    addListener(callback) {
+        this._listeners.push(callback);
+    }
+
+    fire(...args) {
+        this._listeners.forEach(callback => callback(...args));
+    }
+}
+
+class ConstantVideoFeed {
+    constructor(filename) {
+        this.onFrame = new EventEmitter();
+
+        this.targetHeight = 480;
+
+        this.filename = filename;
+        this.canvas = document.createElement('canvas');
+        this.srcImg = document.createElement('img');
+        this.srcImg.classList.add('hidden');
+    }
+
+    getLastFrame() {
+        return this.canvas;
+    }
+
+    start() {
+        this.srcImg.src = this.filename;
+
+        this.srcImg.addEventListener('load', () => {
+            let src = cv.imread(this.srcImg);
+            let dst = new cv.Mat();
+
+            cv.resize(src, dst, new cv.Size(1280, 720), 0, 0, cv.INTER_AREA);
+
+            cv.imshow(this.canvas, dst);
+
+            console.log('IMAGE READY !!!');
+
+            this.onFrame.fire(this.canvas);
+        })
+    }
+
+    stop() {}
+}
+
+class VideoStreamFeed {
+    constructor(media) {
+        this.onFrame = new EventEmitter();
+
+        this.mediaDevices = media;
+        this.video = document.createElement('video');
+        this.canvas = document.createElement('canvas');
+
+        this.timeoutId = null;
+    }
+
+    getLastFrame() {
+        return this.canvas;
+    }
+
+    start() {
+        this.findDeviceId().then(deviceId => {
+            const constraints = {
+                audio: false,
+                video: {
+                    deviceId: deviceId,
+                    width: { ideal: 4096 },
+        height: { ideal: 2160 }
+                }
+            };
+
+            this.mediaDevices.getUserMedia(constraints).then(s => this.onStreamOpened(s)).catch(e => {
+                console.log('FAILED', e);
+            });
+        })
+    }
+
+    stop() {
+        clearTimeout(this.timeoutId);
+    }
+
+    pollStream() {
+        this.canvas.width = this.video.videoWidth;
+        this.canvas.height = this.video.videoHeight;
+        console.log('PAINTING', this.canvas.width, '::', this.canvas.height);
+
+        if (this.video.videoWidth > 0 && this.video.videoHeight > 0) {
+            this.canvas.getContext('2d').drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+
+            this.onFrame.fire(this.canvas);
+        }
+        else {
+            console.log('SKIP FRAME');
+        }
+
+        this.timeoutId = setTimeout(() => this.pollStream(), 250);
+    }
+
+    onStreamOpened(stream) {
+
+        console.log('Starting streaming');
+
+        this.video.srcObject = stream;
+
+        this.video.play();
+
+        this.pollStream();
+    }
+
+    findDeviceId() {
+        return this.mediaDevices.enumerateDevices()
+            .then(function (devices) {
+                devices = devices.filter(d => d.kind === "videoinput");
+
+                let deviceId;
+
+                if (devices.length > 1) {
+                    deviceId = devices[1].deviceId;
+                }
+                else {
+                    deviceId = devices[0].deviceId;
+                }
+
+                return deviceId;
+            });
+    }
 }

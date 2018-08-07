@@ -4,11 +4,8 @@
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
   <title>capture</title>
-  <!--<link rel="stylesheet" href="./tracking.js - feature detection_files/demo.css">-->
 
-  <!--<script src="./tracking.js - feature detection_files/tracking-min.js.pobrane"></script>-->
-  <!--<script src="./tracking.js - feature detection_files/dat.gui.min.js.pobrane"></script>-->
-  <script src="ocv.js"></script>
+  <script src="libs/opencv.js"></script>
   <script src="functions.js"></script>
 
   <style>
@@ -19,7 +16,7 @@
 </head>
 <body>
 
-
+  <button id="captureStop">SHOT !</button> <span id="resolutionContainer">RESOLUTION</span>
   <div class="demo-frame">
     <div class="demo-container">
       <!--<img id="image" src="./tile1.png">-->
@@ -33,7 +30,6 @@
       <div id="cutSets"></div>
       <canvas id="canvasOutput" width="600" height="300" style="display: none"></canvas>
     </div>
-    <video playsinline autoplay></video>
   </div>
 
   <script>
@@ -47,58 +43,36 @@
                                       Math.round(Math.random() * 255), 1);
     }
 
-    function run(videoElement) {
-        
+    function run() {
 
-        const canvas = document.querySelector('#canvasOutput');
-        const videoCanvas = document.createElement('canvas');
-        // videoCanvas.style.width = "640px";
-        // videoCanvas.style.height = "480px";
-        // document.body.appendChild(videoCanvas);
+        document.getElementById('captureStop').addEventListener('click', () => {
+            feed.stop();
 
-        navigator.mediaDevices.enumerateDevices()
-        .then(function(devices) {
-            devices = devices.filter(d => d.kind === "videoinput");
-
-            document.body.appendChild(document.createTextNode(JSON.stringify(devices)));
-            
-            let deviceId;
-            
-            if(devices.length > 1) {
-                deviceId= devices[1].deviceId;
-            }
-            else {
-                deviceId = devices[0].deviceId;
-            }
-
-            document.body.appendChild(document.createTextNode(deviceId));
-
-            startCapture(deviceId);
+            processVideoFull(feed.getLastFrame());
         });
 
-        
+        // let feed = new ConstantVideoFeed('IMG_20180729_231128.jpg');
+        let feed = new VideoStreamFeed(navigator.mediaDevices);
 
-        function processVideo(video) {
-            
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            console.log('PAINTING', canvas.width, '::', canvas.height);
+        feed.onFrame.addListener(canvas => {
+            processVideoFast(canvas);
 
-if(video.videoWidth == 0 || video.videoHeight == 0) {
-                return;
-            }
+            // processVideoFull(canvas);
+            // feed.stop();
+        });
 
-            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        feed.start();
 
+        function processVideoFast(canvas) {
 
             let orig = cv.imread(canvas);
             let src = new cv.Mat();
 
+            document.getElementById('resolutionContainer').innerHTML = `${orig.size().width} x ${orig.size().height}`;
+
             let SCALE = 1.0;
             let MIN_AREA = 2000;
 
-            // console.log(orig.size());
-            
             orig.copyTo(src);
             // cv.resize(orig, src, new cv.Size(0,0), 1/SCALE, 1/SCALE, cv.INTER_AREA);
             let overlay = cv.Mat.ones(src.rows, src.cols, cv.CV_8UC3);
@@ -111,43 +85,85 @@ if(video.videoWidth == 0 || video.videoHeight == 0) {
             let contours = getImportantContours(src, MIN_AREA);
 
             contours.forEach(cnt => {
-                drawCnt(overlay, cnt);
-            })
+                // drawCnt(overlay, cnt);
+                drawBBRect(overlay, cnt.bbox, randColor())
+            });
 
              cv.imshow('canvasOutput0', orig);
              cv.imshow('canvasOutputOverlay', overlay);
+        }
 
+        function processVideoFull(canvas) {
+            let orig = cv.imread(canvas);
+            let src = new cv.Mat();
+
+            document.getElementById('resolutionContainer').innerHTML = `${orig.size().width} x ${orig.size().height}`;
+
+            let SCALE = 1.0;
+            let MIN_AREA = 2000;
+
+
+            cv.resize(orig, src, new cv.Size(0, 0), 1 / SCALE, 1 / SCALE, cv.INTER_AREA);
+
+            let overlay = cv.Mat.ones(src.rows, src.cols, cv.CV_8UC3);
+
+            cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
+            cv.threshold(src, src, 150, 255, cv.THRESH_BINARY);
+
+            let contours = getImportantContours(src, MIN_AREA);
+
+            // cv.cvtColor(src, src, cv.COLOR_GRAY2RGB, 0);
+
+            contours.forEach(cnt => {
+                drawCnt(overlay, cnt);
+            });
+
+            cv.imshow('canvasOutput0', src);
+
+            cutContours(orig, contours, SCALE).forEach(item => { // .slice(22)
+
+
+                cv.cvtColor(item.mat, item.mat, cv.COLOR_RGBA2GRAY, 0);
+                cv.threshold(item.mat, item.mat, 130, 255, cv.THRESH_BINARY);
+
+                // let bbb = cv.boundingRect(item.cnt);
+                // drawBBRect(overlay, bbb, new cv.Scalar(255, 255, 255));
+
+                try {
+                    let target;
+                    // try {
+                        target = findContourAndFixPerspective(item.mat);
+                    // }
+                    // catch (e) {
+                    //     console.error("FAILED TO FIND PERSPECTIVE");
+                    //     return;
+                    // }
+
+                    let targetContours = getImportantContours(target.mat, 20);
+                    let clusters = simpleClusterize(targetContours, 80);
+                    console.log('AAAA', targetContours);
+                    console.log('CLU', clusters);
+                    let tiles = cutTilesFromClusters(target.mat, clusters, false);
+                    tiles.forEach(tile => {
+
+                        let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
+                        cv.imshow(cutCanvas, tile.mat);
+                    })
+                }
+                finally {
+                    let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
+                    cv.imshow(cutCanvas, item.mat);
+                    // throw e;
+                }
+
+
+            });
+
+
+            cv.imshow('canvasOutputOverlay', overlay);
         }
         
 
-        function startCapture(deviceId) {
-
-            const constraints = {
-                audio: false,
-                video: {
-                    deviceId: deviceId
-                }
-            };
-
-            function pollVideoStream() {
-                processVideo(videoElement);
-                setTimeout(() => pollVideoStream(), 250);
-            }
-
-            function handleSuccess(stream) {
-                console.log('Starting stream with', deviceId);
-            // window.stream = stream; // make stream available to browser console
-                videoElement.srcObject = stream;
-
-                pollVideoStream();
-            }
-
-            function handleError(error) {
-            console.log('navigator.getUserMedia error: ', error);
-            }
-
-            navigator.mediaDevices.getUserMedia(constraints).then(handleSuccess).catch(handleError);
-        }
     }
 
 
