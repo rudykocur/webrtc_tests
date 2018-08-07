@@ -354,8 +354,6 @@ class ConstantVideoFeed {
     constructor(filename) {
         this.onFrame = new EventEmitter();
 
-        this.targetHeight = 480;
-
         this.filename = filename;
         this.canvas = document.createElement('canvas');
         this.srcImg = document.createElement('img');
@@ -373,7 +371,7 @@ class ConstantVideoFeed {
             let src = cv.imread(this.srcImg);
             let dst = new cv.Mat();
 
-            cv.resize(src, dst, new cv.Size(1280, 720), 0, 0, cv.INTER_AREA);
+            cv.resize(src, dst, new cv.Size(1920, 1440), 0, 0, cv.INTER_AREA);
 
             cv.imshow(this.canvas, dst);
 
@@ -402,14 +400,14 @@ class VideoStreamFeed {
     }
 
     start() {
-        console.log('Starting video feed with resolution', 1920, 'x', 1080);
+        console.log('Starting rear video feed with ideal resolution', 1920, 'x', 1080);
         this.findDeviceId().then(deviceId => {
             const constraints = {
                 audio: false,
                 video: {
-                    deviceId: deviceId,
-                    width: {ideal: 1920},
-                    height: {ideal: 1080}
+                    width: {ideal: 1920, max: 1920},
+                    height: {ideal: 1080, max: 1440},
+                    facingMode: "environment"
                 }
             };
 

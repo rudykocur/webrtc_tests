@@ -51,14 +51,14 @@
             processVideoFull(feed.getLastFrame());
         });
 
-        // let feed = new ConstantVideoFeed('IMG_20180729_231128.jpg');
-        let feed = new VideoStreamFeed(navigator.mediaDevices);
+        let feed = new ConstantVideoFeed('IMG_20180729_231128.jpg');
+        // let feed = new VideoStreamFeed(navigator.mediaDevices);
 
         feed.onFrame.addListener(canvas => {
-            processVideoFast(canvas);
+            // processVideoFast(canvas);
 
-            // processVideoFull(canvas);
-            // feed.stop();
+            processVideoFull(canvas);
+            feed.stop();
         });
 
         feed.start();
