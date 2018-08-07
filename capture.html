@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html >
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+  <title>capture</title>
+  <!--<link rel="stylesheet" href="./tracking.js - feature detection_files/demo.css">-->
+
+  <!--<script src="./tracking.js - feature detection_files/tracking-min.js.pobrane"></script>-->
+  <!--<script src="./tracking.js - feature detection_files/dat.gui.min.js.pobrane"></script>-->
+  <script src="opencv.js"></script>
+  <script src="functions.js"></script>
+
+  <style>
+      video {
+          display: none;
+      }
+  </style>
+</head>
+<body>
+
+
+  <div class="demo-frame">
+    <div class="demo-container">
+      <!--<img id="image" src="./tile1.png">-->
+      <!--<img id="input" src="./tile9.png">-->
+      <img id="input">
+      <!--<img id="image2" src="./tile1.png">-->
+      <div style="position: relative">
+      <canvas id="canvasOutput0" width="600" height="300"></canvas>
+      <canvas id="canvasOutputOverlay" width="600" height="300" style="position: absolute; top: 0; left:0; opacity: 0.7"></canvas>
+      </div>
+      <div id="cutSets"></div>
+      <canvas id="canvasOutput" width="600" height="300"></canvas>
+    </div>
+    <video playsinline autoplay></video>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('READY', window.location.hash);
+            run(document.querySelector('video'));
+    });
+
+    function run(videoElement) {
+        const canvas = document.querySelector('#canvasOutput');
+        const videoCanvas = document.createElement('canvas');
+
+        
+
+        function processVideo(video) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            //console.log('PAINTING', canvas.width, '::', canvas.height);
+            videoCanvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+
+            let orig = cv.imread(videoCanvas);
+            let src = new cv.Mat();
+
+            let SCALE = 1.0;
+            let MIN_AREA = 2000;
+            
+
+            cv.resize(orig, src, new cv.Size(0,0), 1/SCALE, 1/SCALE, cv.INTER_AREA);
+
+            let overlay = cv.Mat.ones(src.rows, src.cols, cv.CV_8UC3);
+
+            cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
+            cv.threshold(src, src, 150, 255, cv.THRESH_BINARY);
+
+            let contours = getImportantContours(src, MIN_AREA);
+
+             cv.imshow('canvasOutputOverlay', src);
+
+        }
+
+
+        const constraints = {
+            audio: false,
+            video: true
+        };
+
+        function pollVideoStream() {
+            processVideo(videoElement);
+            setTimeout(() => pollVideoStream(), 250);
+        }
+
+        function handleSuccess(stream) {
+        // window.stream = stream; // make stream available to browser console
+            videoElement.srcObject = stream;
+
+            pollVideoStream();
+        }
+
+        function handleError(error) {
+        console.log('navigator.getUserMedia error: ', error);
+        }
+
+        navigator.mediaDevices.getUserMedia(constraints).then(handleSuccess).catch(handleError);
+    }
+
+
+  </script>
+
+
+</body></html>
