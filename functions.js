@@ -1,17 +1,37 @@
 
 
-function getImportantContours(src, minArea) {
+function getImportantContours(src, minArea, skipEdges) {
+    console.log('GET IMPORTANT CONTOURS', minArea, '::', skipEdges, '::', src.size());
+    let srcSize = src.size();
+
     let contours = new cv.MatVector();
     let hierarchy = new cv.Mat();
     cv.findContours(src, contours, hierarchy, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE);
+
+    hierarchy.delete();
 
     let result = [];
 
     for (let i = 0; i < contours.size(); ++i) {
 
         let cnt = contours.get(i);
-        let cntArea = cv.contourArea(cnt);
         let cntBbox = cv.boundingRect(cnt);
+
+        if(skipEdges) {
+            if(cntBbox.x === 0 || cntBbox.y === 0) {
+                continue;
+            }
+
+            if(cntBbox.x + cntBbox.width >= srcSize.width) {
+                continue;
+            }
+
+            if(cntBbox.y + cntBbox.height >= srcSize.height) {
+                continue;
+            }
+        }
+
+        let cntArea = cv.contourArea(cnt);
 
         if(cntArea < minArea) {
             continue;
@@ -29,6 +49,8 @@ function getImportantContours(src, minArea) {
             center: {x: cX, y: cY}
         });
     }
+
+    contours.delete();
 
     return result;
 }
@@ -59,12 +81,12 @@ function cutContours(src, contours, upscale) {
 }
 
 
-function getContourBBCorners(contour) {
-    let m2 = new cv.Mat();
-    cv.approxPolyDP(contour, m2, 150,true);
-
-    return getBbox(m2);
-}
+// function getContourBBCorners(bbox) {
+//     let m2 = new cv.Mat();
+//     cv.approxPolyDP(contour, m2, 100,true);
+//
+//     return getBbox(m2);
+// }
 
 function getBbox(mat) {
     let points = [];
@@ -115,6 +137,8 @@ function rotateImage(src, angle) {
 
 function cutTilesFromClusters(src, clusters, invertColors) {
 
+    // cv.cvtColor(src, src, cv.COLOR_GRAY2RGB, 0);
+
     invertColors = (typeof invertColors === "undefined") ? true : invertColors;
 
     return clusters.map(cluster => {
@@ -122,6 +146,13 @@ function cutTilesFromClusters(src, clusters, invertColors) {
         let clusterBB = findClusterBB(cluster, src.size());
 
         console.log("ROI CL", src.size(), '::', clusterBB, '::', cluster);
+        // let col = randColor();
+        //
+        // cluster.forEach(c => {
+        //     drawCnt(src, c, col);
+        // });
+        //
+        // drawBBRect(src, clusterBB, randColor());
 
         let tmpTile = src.roi(clusterBB);
         let tile = new cv.Mat();
@@ -183,7 +214,9 @@ function findContourAndFixPerspective(src) {
     let biggest = important[0];
     let bbox = cv.boundingRect(biggest.mat);
 
-    drawBBRect(src, bbox, new cv.Scalar(0,0,0));
+    // cv.cvtColor(src, src, cv.COLOR_GRAY2RGB, 0);
+
+    drawBBRect(src, bbox, new cv.Scalar(0, 0, 0, 0));
 
     let corners = getContourBBCorners(biggest.mat);
 
@@ -197,36 +230,67 @@ function findContourAndFixPerspective(src) {
     }
 }
 
+function findApproxBbox(contour) {
+    let epsilons = [500, 200, 100, 50];
+
+    for(let i = 0; i < epsilons.length; i++) {
+        let m2 = new cv.Mat();
+        cv.approxPolyDP(contour,  m2, epsilons[i],true);
+
+        // console.log('TEST', epsilons[i], '::', m2.size());
+
+        if(m2.size().height === 4) {
+            return m2;
+        }
+    }
+
+    return null;
+}
+
 function findContourAndFixPerspective2(src) {
     let important = getImportantContours(src, 1000);
 
-    // cv.cvtColor(src, src, cv.COLOR_GRAY2RGBA, 0);
-
     important.sort((a, b) => b.area-a.area);
-    let biggest = important[0].mat;
-    let bbox = cv.boundingRect(biggest);
 
-    console.log('BBOX', bbox);
+    console.log('IMPORTANT CNTS', important, '::', src.size());
 
-    drawBBRect(src, bbox, randColor());
+    let biggest = important[0];
+    let bbox = cv.boundingRect(biggest.mat);
 
-    let corners = getContourBBCorners(biggest);
+    // let m3 = new cv.Mat();
+    // cv.approxPolyDP(biggest.mat,  m3, 40,true);
+    let m2 = findApproxBbox(biggest.mat);
 
-    let m2 = new cv.Mat();
-    cv.approxPolyDP(biggest,  m2, 500,true);
+    if(!m2) {
+        return null;
+    }
+
+    // cv.cvtColor(src, src, cv.COLOR_GRAY2RGB, 0);
+
+    // drawBBRect(src, bbox, randColor());
+    drawCnt(src, m2);
+    // drawCnt(src, biggest.mat);
+
+    console.log('OMG M2', m2.size(), '::', m2);
+
+    // let corners = getContourBBCorners(biggest.mat);
+
+    let corners = getBbox(m2);
+
+
 
     return {
         mat: flatten(src, corners, bbox, 200),
-        contour: biggest,
+        contour: biggest.mat,
         box: m2
     }
 }
 
-function drawCnt(dst, contour) {
+function drawCnt(dst, contour, color) {
     let tmpVect = new cv.MatVector();
     tmpVect.push_back(contour.mat || contour);
 
-    cv.drawContours(dst, tmpVect, -1, randColor(), 2, cv.LINE_8);
+    cv.drawContours(dst, tmpVect, -1, color || randColor(), 2, cv.LINE_8);
 }
 
 function drawBBRect(dst, bbox, color) {
@@ -241,7 +305,7 @@ function findClusterBB(contours, imageSize) {
     contours.forEach(c => {
         let cBB = cv.boundingRect(c.mat);
 
-        if(cBB.x + cBB.width >= imageSize.width || cBB.y + cBB.height >= imageSize.height) {
+        if(cBB.x + cBB.width > imageSize.width || cBB.y + cBB.height > imageSize.height) {
             return;
         } 
 

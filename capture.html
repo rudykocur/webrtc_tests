@@ -86,11 +86,15 @@
 
             contours.forEach(cnt => {
                 // drawCnt(overlay, cnt);
-                drawBBRect(overlay, cnt.bbox, randColor())
+                drawBBRect(overlay, cnt.bbox, randColor());
+
+                cnt.mat.delete();
             });
 
              cv.imshow('canvasOutput0', orig);
              cv.imshow('canvasOutputOverlay', overlay);
+
+             [orig, src, overlay].forEach(obj => obj.delete())
         }
 
         function processVideoFull(canvas) {
@@ -99,8 +103,8 @@
 
             document.getElementById('resolutionContainer').innerHTML = `${orig.size().width} x ${orig.size().height}`;
 
-            let SCALE = 1.0;
-            let MIN_AREA = 2000;
+            let SCALE = 2.0;
+            let MIN_AREA = 3000;
 
 
             cv.resize(orig, src, new cv.Size(0, 0), 1 / SCALE, 1 / SCALE, cv.INTER_AREA);
@@ -112,15 +116,16 @@
 
             let contours = getImportantContours(src, MIN_AREA);
 
-            // cv.cvtColor(src, src, cv.COLOR_GRAY2RGB, 0);
+            cv.cvtColor(src, src, cv.COLOR_GRAY2RGB, 0);
 
             contours.forEach(cnt => {
                 drawCnt(overlay, cnt);
             });
 
             cv.imshow('canvasOutput0', src);
+            cv.imshow('canvasOutputOverlay', overlay);
 
-            cutContours(orig, contours, SCALE).forEach(item => { // .slice(22)
+            cutContours(orig, contours, SCALE).slice(0).forEach(item => { // .slice(22)
 
 
                 cv.cvtColor(item.mat, item.mat, cv.COLOR_RGBA2GRAY, 0);
@@ -128,19 +133,24 @@
 
                 // let bbb = cv.boundingRect(item.cnt);
                 // drawBBRect(overlay, bbb, new cv.Scalar(255, 255, 255));
+                let target;
 
                 try {
-                    let target;
+
                     // try {
-                        target = findContourAndFixPerspective(item.mat);
+                        target = findContourAndFixPerspective2(item.mat);
+
+                        if(!target) {
+                            return;
+                        }
                     // }
                     // catch (e) {
                     //     console.error("FAILED TO FIND PERSPECTIVE");
                     //     return;
                     // }
 
-                    let targetContours = getImportantContours(target.mat, 20);
-                    let clusters = simpleClusterize(targetContours, 80);
+                    let targetContours = getImportantContours(target.mat, 20, true);
+                    let clusters = simpleClusterize(targetContours, 70);
                     console.log('AAAA', targetContours);
                     console.log('CLU', clusters);
                     let tiles = cutTilesFromClusters(target.mat, clusters, false);
@@ -151,8 +161,11 @@
                     })
                 }
                 finally {
-                    let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
-                    cv.imshow(cutCanvas, item.mat);
+                    if(target){
+                        // let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
+                        // cv.imshow(cutCanvas, target.mat);
+                    }
+                    // cv.imshow(cutCanvas, item.mat);
                     // throw e;
                 }
 
@@ -160,7 +173,7 @@
             });
 
 
-            cv.imshow('canvasOutputOverlay', overlay);
+
         }
         
 
