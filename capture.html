@@ -27,11 +27,11 @@
       <img id="input">
       <!--<img id="image2" src="./tile1.png">-->
       <div style="position: relative">
-      <canvas id="canvasOutput0" width="600" height="300" style="opacity: 0.5"></canvas>
-      <canvas id="canvasOutputOverlay" width="600" height="300" style="position: absolute; top: 0; left:0; opacity: 0.1"></canvas>
+      <canvas id="canvasOutput0" width="600" height="300" style="opacity: 1"></canvas>
+      <canvas id="canvasOutputOverlay" width="600" height="300" style="position: absolute; top: 0; left:0; opacity: 0.6"></canvas>
       </div>
       <div id="cutSets"></div>
-      <canvas id="canvasOutput" width="600" height="300"></canvas>
+      <canvas id="canvasOutput" width="600" height="300" style="display: none"></canvas>
     </div>
     <video playsinline autoplay></video>
   </div>
@@ -54,7 +54,7 @@
         const videoCanvas = document.createElement('canvas');
         // videoCanvas.style.width = "640px";
         // videoCanvas.style.height = "480px";
-        document.body.appendChild(videoCanvas);
+        // document.body.appendChild(videoCanvas);
 
         navigator.mediaDevices.enumerateDevices()
         .then(function(devices) {
