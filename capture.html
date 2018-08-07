@@ -8,7 +8,7 @@
 
   <!--<script src="./tracking.js - feature detection_files/tracking-min.js.pobrane"></script>-->
   <!--<script src="./tracking.js - feature detection_files/dat.gui.min.js.pobrane"></script>-->
-  <script src="opencv.js"></script>
+  <script src="ocv.js"></script>
   <script src="functions.js"></script>
 
   <style>
@@ -27,8 +27,8 @@
       <img id="input">
       <!--<img id="image2" src="./tile1.png">-->
       <div style="position: relative">
-      <canvas id="canvasOutput0" width="600" height="300"></canvas>
-      <canvas id="canvasOutputOverlay" width="600" height="300" style="position: absolute; top: 0; left:0; opacity: 0.7"></canvas>
+      <canvas id="canvasOutput0" width="600" height="300" style="opacity: 0.5"></canvas>
+      <canvas id="canvasOutputOverlay" width="600" height="300" style="position: absolute; top: 0; left:0; opacity: 0.1"></canvas>
       </div>
       <div id="cutSets"></div>
       <canvas id="canvasOutput" width="600" height="300"></canvas>
@@ -41,6 +41,11 @@
         console.log('READY', window.location.hash);
             run(document.querySelector('video'));
     });
+
+    function randColor() {
+        return new cv.Scalar(Math.round(Math.random() * 255), Math.round(Math.random() * 255),
+                                      Math.round(Math.random() * 255), 1);
+    }
 
     function run(videoElement) {
         const canvas = document.querySelector('#canvasOutput');
@@ -63,15 +68,21 @@
             
 
             cv.resize(orig, src, new cv.Size(0,0), 1/SCALE, 1/SCALE, cv.INTER_AREA);
-
             let overlay = cv.Mat.ones(src.rows, src.cols, cv.CV_8UC3);
+
+            // let overlay = cv.Mat.ones(src.rows, src.cols, cv.CV_8UC3);
 
             cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
             cv.threshold(src, src, 150, 255, cv.THRESH_BINARY);
 
             let contours = getImportantContours(src, MIN_AREA);
 
-             cv.imshow('canvasOutputOverlay', src);
+            contours.forEach(cnt => {
+                drawCnt(overlay, cnt);
+            })
+
+             cv.imshow('canvasOutput0', orig);
+             cv.imshow('canvasOutputOverlay', overlay);
 
         }
 
