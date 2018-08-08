@@ -469,8 +469,10 @@ class VideoStreamFeed {
             const constraints = {
                 audio: false,
                 video: {
-                    width: {ideal: 1920, max: 1920},
-                    height: {ideal: 1080, max: 1440},
+                    width: { ideal: 4096},
+                    height: {ideal: 2160},
+                    // width: {ideal: 1920, max: 1920},
+                    // height: {ideal: 1080, max: 1440},
                     facingMode: "environment"
                 }
             };
