@@ -457,6 +457,13 @@ class VideoStreamFeed {
         this.canvas = document.createElement('canvas');
 
         this.timeoutId = null;
+
+        this.resolution = {
+            width: { ideal: 4096},
+            height: {ideal: 2160},
+            // width: {ideal: 1920, max: 1920},
+            // height: {ideal: 1080, max: 1440},
+        }
     }
 
     getLastFrame() {
@@ -464,15 +471,13 @@ class VideoStreamFeed {
     }
 
     start() {
-        console.log('Starting rear video feed with ideal resolution', 1920, 'x', 1080);
+        console.log('Starting rear video feed with resolution', this.resolution);
         this.findDeviceId().then(deviceId => {
             const constraints = {
                 audio: false,
                 video: {
-                    width: { ideal: 4096},
-                    height: {ideal: 2160},
-                    // width: {ideal: 1920, max: 1920},
-                    // height: {ideal: 1080, max: 1440},
+                    width: this.resolution.width,
+                    height: this.resolution.height,
                     facingMode: "environment"
                 }
             };
