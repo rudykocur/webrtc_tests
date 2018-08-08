@@ -1,7 +1,7 @@
 
 
 function getImportantContours(src, minArea, skipEdges) {
-    console.log('GET IMPORTANT CONTOURS', minArea, '::', skipEdges, '::', src.size());
+    // console.log('GET IMPORTANT CONTOURS', minArea, '::', skipEdges, '::', src.size());
     let srcSize = src.size();
 
     let contours = new cv.MatVector();
@@ -449,7 +449,7 @@ class ConstantVideoFeed {
 }
 
 class VideoStreamFeed {
-    constructor(media) {
+    constructor(media, timeout) {
         this.onFrame = new EventEmitter();
 
         this.mediaDevices = media;
@@ -457,6 +457,7 @@ class VideoStreamFeed {
         this.canvas = document.createElement('canvas');
 
         this.timeoutId = null;
+        this.timeout = timeout || 250;
 
         this.resolution = {
             width: { ideal: 4096},
@@ -490,12 +491,20 @@ class VideoStreamFeed {
 
     stop() {
         clearTimeout(this.timeoutId);
+
+        let stream = this.video.srcObject;
+        let tracks = stream.getTracks();
+
+        tracks.forEach(function (track) {
+            track.stop();
+        });
+
+        this.video.srcObject = null;
     }
 
     pollStream() {
         this.canvas.width = this.video.videoWidth;
         this.canvas.height = this.video.videoHeight;
-        console.log('PAINTING', this.canvas.width, '::', this.canvas.height);
 
         if (this.video.videoWidth > 0 && this.video.videoHeight > 0) {
             this.canvas.getContext('2d').drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
@@ -506,7 +515,7 @@ class VideoStreamFeed {
             console.log('SKIP FRAME');
         }
 
-        this.timeoutId = setTimeout(() => this.pollStream(), 250);
+        this.timeoutId = setTimeout(() => this.pollStream(), this.timeout);
     }
 
     onStreamOpened(stream) {

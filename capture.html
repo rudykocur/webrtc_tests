@@ -16,7 +16,7 @@
 </head>
 <body>
 
-  <button id="captureStop">SHOT !</button> <span id="resolutionContainer">RESOLUTION</span>
+  <button id="captureStop">SHOT !</button> <span id="resolutionContainer">RESOLUTION</span> <span id="fpsCounter">FPS</span>
   <div class="demo-frame">
     <div class="demo-container">
       <!--<img id="image" src="./tile1.png">-->
@@ -52,10 +52,14 @@
         });
 
         // let feed = new ConstantVideoFeed('IMG_20180729_231128.jpg');
-        let feed = new VideoStreamFeed(navigator.mediaDevices);
+        let feed = new VideoStreamFeed(navigator.mediaDevices, 5);
 
         feed.onFrame.addListener(canvas => {
+            let d1 = new Date();
             processVideoFast(canvas);
+            let d2 = new Date();
+
+            document.getElementById('fpsCounter').innerText = (d2-d1) + ' ms';
 
             // processVideoFull(canvas);
             // feed.stop();
