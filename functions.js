@@ -231,7 +231,7 @@ function findContourAndFixPerspective(src) {
 }
 
 function findApproxBbox(contour) {
-    let epsilons = [500, 200, 100, 50];
+    let epsilons = [500, 200, 150, 125, 110, 100, 75, 50];
 
     for(let i = 0; i < epsilons.length; i++) {
         let m2 = new cv.Mat();
@@ -262,13 +262,15 @@ function findContourAndFixPerspective2(src) {
     let m2 = findApproxBbox(biggest.mat);
 
     if(!m2) {
+        //cv.cvtColor(src, src, cv.COLOR_GRAY2RGB, 0);
+        drawCnt(src, biggest.mat);
         return null;
     }
 
     // cv.cvtColor(src, src, cv.COLOR_GRAY2RGB, 0);
-
+    // drawCnt(src, biggest.mat);
     // drawBBRect(src, bbox, randColor());
-    drawCnt(src, m2);
+    // drawCnt(src, m2);
     // drawCnt(src, biggest.mat);
 
     console.log('OMG M2', m2.size(), '::', m2);
@@ -377,9 +379,6 @@ function flatten(src, corners, bbox, desiredHeight) {
 
     let dsize = new cv.Size(maxWidth, maxHeight);
 
-
-
-
   let srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
       corners.tl.x, corners.tl.y,
       corners.tr.x, corners.tr.y,
@@ -433,11 +432,8 @@ class ConstantVideoFeed {
 
         this.srcImg.addEventListener('load', () => {
             let src = cv.imread(this.srcImg);
-            let dst = new cv.Mat();
 
-            cv.resize(src, dst, new cv.Size(1920, 1440), 0, 0, cv.INTER_AREA);
-
-            cv.imshow(this.canvas, dst);
+            cv.imshow(this.canvas, src);
 
             console.log('IMAGE READY !!!');
 
