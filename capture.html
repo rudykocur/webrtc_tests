@@ -73,11 +73,11 @@
             document.getElementById('fpsCounter').innerText = 'Full process time: ' + (d2-d1) + ' ms';
         });
 
-        let feed = new ConstantVideoFeed('photos/IMG_20180811_111345.jpg');
+        // let feed = new ConstantVideoFeed('photos/IMG_20180811_111345.jpg');
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_111404.jpg');
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_111439.jpg');
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_111458.jpg');
-        // let feed = new VideoStreamFeed(navigator.mediaDevices, 100);
+        let feed = new VideoStreamFeed(navigator.mediaDevices, 100);
 
         feed.onFrame.addListener(canvas => {
             let d1 = new Date();
