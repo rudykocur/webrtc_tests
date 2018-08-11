@@ -18,11 +18,10 @@
       }
 
     #cutSets canvas {
-    /* display: block; */
-    padding: 10px;
-    background: pink;
-    margin: 5px;
-  }
+        padding: 10px;
+        background: pink;
+        margin: 5px;
+    }
   </style>
 </head>
 <body>
@@ -53,7 +52,7 @@
 
     function randColor() {
         return new cv.Scalar(Math.round(Math.random() * 255), Math.round(Math.random() * 255),
-                                      Math.round(Math.random() * 255), 1);
+                                      Math.round(Math.random() * 255));
     }
 
     function run() {
@@ -99,16 +98,10 @@
 
             document.getElementById('resolutionContainer').innerHTML = `${orig.size().width} x ${orig.size().height}`;
 
-            let SCALE = 1.0;
-
-            orig.copyTo(src);
-            // cv.resize(orig, src, new cv.Size(0,0), 1/SCALE, 1/SCALE, cv.INTER_AREA);
-            let overlay = cv.Mat.ones(src.rows, src.cols, cv.CV_8UC3);
-
-            // let overlay = cv.Mat.ones(src.rows, src.cols, cv.CV_8UC3);
-
-            cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
+            cv.cvtColor(orig, src, cv.COLOR_RGBA2GRAY, 0);
             cv.threshold(src, src, THRESHOLD, 255, cv.THRESH_BINARY);
+
+            let overlay = cv.Mat.ones(src.rows, src.cols, cv.CV_8UC3);
 
             let contours = getImportantContours(src, MIN_AREA);
 
@@ -134,19 +127,12 @@
 
             let SCALE = 1.0;
 
-            // orig.copyTo(src);
-            // cv.resize(orig, src, new cv.Size(0, 0), 1 / SCALE, 1 / SCALE, cv.INTER_AREA);
-
-
-
             cv.cvtColor(orig, src, cv.COLOR_RGBA2GRAY, 0);
             cv.threshold(src, src, THRESHOLD, 255, cv.THRESH_BINARY);
 
             let overlay = cv.Mat.ones(src.rows, src.cols, cv.CV_8UC3);
 
             let contours = getImportantContours(src, MIN_AREA);
-
-            // cv.cvtColor(src, src, cv.COLOR_GRAY2RGB, 0);
 
             contours.forEach(cnt => {
                 drawCnt(overlay, cnt);
@@ -159,12 +145,6 @@
 
             cutContours(src, contours, SCALE).slice(0).forEach(item => { // .slice(22)
 
-
-                // cv.cvtColor(item.mat, item.mat, cv.COLOR_RGBA2GRAY, 0);
-                // cv.threshold(item.mat, item.mat, 130, 255, cv.THRESH_BINARY);
-
-                // let bbb = cv.boundingRect(item.cnt);
-                // drawBBRect(overlay, bbb, new cv.Scalar(255, 255, 255));
                 let target;
 
                 try {
@@ -186,8 +166,8 @@
 
                     let targetContours = getImportantContours(target.mat, 10, true);
                     let clusters = simpleClusterize(targetContours, 80);
-                    console.log('AAAA', targetContours);
-                    console.log('CLU', clusters);
+                    // console.log('AAAA', targetContours);
+                    // console.log('CLU', clusters);
                     let tiles = cutTilesFromClusters(target.mat, clusters, false);
                     tiles.forEach(tile => {
 

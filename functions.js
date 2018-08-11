@@ -1,7 +1,6 @@
 
 
 function getImportantContours(src, minArea, skipEdges) {
-    // console.log('GET IMPORTANT CONTOURS', minArea, '::', skipEdges, '::', src.size());
     let srcSize = src.size();
 
     let contours = new cv.MatVector();
@@ -60,8 +59,6 @@ function cutContours(src, contours, upscale) {
     let SCALE = upscale || 1;
     return contours.map(cnt => {
         let hullBB = cv.boundingRect(cnt.mat);
-
-        console.log('HULL BB', hullBB);
 
         let cutRect = new cv.Rect(
           hullBB.x * SCALE, hullBB.y * SCALE,
@@ -252,39 +249,23 @@ function findContourAndFixPerspective2(src) {
 
     important.sort((a, b) => b.area-a.area);
 
-    console.log('IMPORTANT CNTS', important, '::', src.size());
-
     let biggest = important[0];
     let bbox = cv.boundingRect(biggest.mat);
 
-    // let m3 = new cv.Mat();
-    // cv.approxPolyDP(biggest.mat,  m3, 40,true);
-    let m2 = findApproxBbox(biggest.mat);
+    let box = findApproxBbox(biggest.mat);
 
-    if(!m2) {
+    if(!box) {
         //cv.cvtColor(src, src, cv.COLOR_GRAY2RGB, 0);
         drawCnt(src, biggest.mat);
         return null;
     }
 
-    // cv.cvtColor(src, src, cv.COLOR_GRAY2RGB, 0);
-    // drawCnt(src, biggest.mat);
-    // drawBBRect(src, bbox, randColor());
-    // drawCnt(src, m2);
-    // drawCnt(src, biggest.mat);
-
-    console.log('OMG M2', m2.size(), '::', m2);
-
-    // let corners = getContourBBCorners(biggest.mat);
-
-    let corners = getBbox(m2);
-
-
+    let corners = getBbox(box);
 
     return {
         mat: flatten(src, corners, bbox, 200),
         contour: biggest.mat,
-        box: m2
+        box: box
     }
 }
 
