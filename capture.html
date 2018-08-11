@@ -1,12 +1,16 @@
-<!DOCTYPE html>
-<html >
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<!doctype html>
+<html class="no-js" lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <title>capture</title>
 
   <script src="libs/opencv.js"></script>
   <script src="functions.js"></script>
+
+<link rel="stylesheet" href="foundation.min.css">
 
   <style>
       video {
@@ -16,7 +20,6 @@
 </head>
 <body>
 
-  <button id="captureStop">SHOT !</button> <span id="resolutionContainer">RESOLUTION</span> <span id="fpsCounter">FPS</span>
   <div class="demo-frame">
     <div class="demo-container">
       <!--<img id="image" src="./tile1.png">-->
@@ -31,6 +34,9 @@
       <canvas id="canvasOutput" width="600" height="300" style="display: none"></canvas>
     </div>
   </div>
+
+    <button class="button primary large" id="captureStop">SHOT !</button> <span id="resolutionContainer">RESOLUTION</span> <span id="fpsCounter">FPS</span>
+
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
@@ -107,7 +113,7 @@
 
             document.getElementById('resolutionContainer').innerHTML = `${orig.size().width} x ${orig.size().height}`;
 
-            let SCALE = 2.0;
+            let SCALE = 1.0;
             let MIN_AREA = 3000;
 
 
