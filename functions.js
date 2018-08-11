@@ -460,8 +460,8 @@ class VideoStreamFeed {
         this.timeout = timeout || 250;
 
         this.resolution = {
-            width: { ideal: 4096},
-            height: {ideal: 2160},
+            width: { ideal: 640},
+            height: {ideal: 480 },
             // width: {ideal: 1920, max: 1920},
             // height: {ideal: 1080, max: 1440},
         }
