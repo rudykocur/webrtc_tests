@@ -142,7 +142,7 @@
     function run(matcher) {
 
         let MIN_AREA = 5000;
-        let THRESHOLD = 130;
+        let THRESHOLD = 120;
 
         document.getElementById('captureStop').addEventListener('click', () => {
             // let d1 = new Date();
@@ -221,7 +221,7 @@
                 let setType = getSetTypeFromRatio(bbRatio);
 
                 if(captureRectPosition && positionInBbox(captureRectPosition, cnt.bbox)) {
-                    processContour(src, cnt, setType);
+                    processContour(src, cnt, setType, matcher);
                     captureRectPosition = null;
                 }
 
@@ -243,7 +243,7 @@
              [orig, src, overlay].forEach(obj => obj.delete())
         }
 
-        function processContour(src, contour, setType) {
+        function processContour(src, contour, setType, matcher) {
             let item = cutContour(src, contour, 1);
 
             let target = findContourAndFixPerspective2(item.mat);
@@ -284,13 +284,19 @@
 
             slicer.sliceSet(target.mat, setType).forEach(img => {
                 let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
-                cv.imshow(cutCanvas, img);
+                // cv.imshow(cutCanvas, img);
 
                 let tileContours = getImportantContours(img, 10, true);
 
                 let tile = cutTileFromContours(img, tileContours);
 
                 // cv.imshow(cutCanvas, tile.mat);
+
+                let matchResult = matcher.matchTile(tile.mat);
+
+                cv.imshow(cutCanvas2, matchResult.bestMatch.diffImg);
+
+                matchResult.dispose();
             })
         }
 
