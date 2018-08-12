@@ -9,7 +9,9 @@
 
   <script src="libs/opencv.js"></script>
   <script src="functions.js"></script>
+  <script src="feed.js"></script>
   <script src="matcher.js"></script>
+  <script src="slicer.js"></script>
 
 <link rel="stylesheet" href="foundation.min.css">
 
@@ -31,7 +33,17 @@
     #cutSets canvas.bestMatch {
       display: block;
       background: green;
-  }  </style>
+    }
+
+    #videoPreview {
+        display: inline-block;
+    }
+
+      #videoPreview canvas {
+          display: inline-block;
+      }
+
+  </style>
 </head>
 <body>
 
@@ -39,9 +51,8 @@
     <div class="demo-container">
       <!--<img id="image" src="./tile1.png">-->
       <!--<img id="input" src="./tile9.png">-->
-      <img id="input">
       <!--<img id="image2" src="./tile1.png">-->
-      <div style="position: relative">
+      <div id="videoPreview" style="position: relative">
       <canvas id="canvasOutput0" width="600" height="300" style="opacity: 1"></canvas>
       <canvas id="canvasOutputOverlay" width="600" height="300" style="position: absolute; top: 0; left:0; opacity: 0.6"></canvas>
       </div>
@@ -52,7 +63,7 @@
 
     <button class="button primary large" id="captureStop">SHOT !</button> <span id="resolutionContainer">RESOLUTION</span> <span id="fpsCounter">FPS</span>
 
-    <div id="samples"></div>
+    <div id="samples" style="position: absolute; top: -1000px; left: -1000px"></div>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
         console.log('READY', window.location.hash);
@@ -114,20 +125,15 @@
                                       Math.round(Math.random() * 255));
     }
 
+    const SET_TYPE_PUNG = 'Pung';
+    const SET_TYPE_KONG = 'Kong';
+
     function getSetTypeFromRatio(ratio) {
-        if(ratio < 2.2) {
-            return 'Con. Pung';
-        }
-
         if(ratio < 2.5) {
-            return 'Rev. Pung';
+            return SET_TYPE_PUNG;
         }
 
-        if(ratio < 2.9) {
-            return 'Con. Kong'
-        }
-
-        return 'Rev. Kong';
+        return SET_TYPE_KONG;
     }
 
     /**
@@ -136,17 +142,17 @@
     function run(matcher) {
 
         let MIN_AREA = 5000;
-        let THRESHOLD = 150;
+        let THRESHOLD = 130;
 
         document.getElementById('captureStop').addEventListener('click', () => {
-            let d1 = new Date();
+            // let d1 = new Date();
             feed.stop();
 
-            processVideoFull(feed.getLastFrame());
-
-            let d2 = new Date();
-
-            document.getElementById('fpsCounter').innerText = 'Full process time: ' + (d2-d1) + ' ms';
+            // processVideoFull(feed.getLastFrame());
+            //
+            // let d2 = new Date();
+            //
+            // document.getElementById('fpsCounter').innerText = 'Full process time: ' + (d2-d1) + ' ms';
         });
 
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_111345.jpg');
@@ -162,7 +168,7 @@
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_190844.jpg');
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_192116.jpg');
         // let feed = new ConstantVideoFeed('images/source.jpg');
-        let feed = new VideoStreamFeed(navigator.mediaDevices, 5);
+        let feed = new VideoStreamFeed(navigator.mediaDevices, 30);
 
         feed.onFrame.addListener(canvas => {
             let d1 = new Date();
@@ -211,17 +217,20 @@
             contours.forEach(cnt => {
                 let col = randColor();
 
+                let bbRatio = cnt.bbox.width / cnt.bbox.height;
+                let setType = getSetTypeFromRatio(bbRatio);
+
                 if(captureRectPosition && positionInBbox(captureRectPosition, cnt.bbox)) {
-                    processContour(src, cnt);
+                    processContour(src, cnt, setType);
                     captureRectPosition = null;
                 }
 
                 drawCnt(overlay, cnt, col);
                 drawBBRect(overlay, cnt.bbox, col);
 
-                let bbRatio = cnt.bbox.width / cnt.bbox.height;
 
-                let text = getSetTypeFromRatio(bbRatio) + ' ' + (Math.round(bbRatio * 1000) / 1000);
+
+                let text = setType + ' ' + (Math.round(bbRatio * 1000) / 1000);
                 let pt = new cv.Point(cnt.bbox.x + 20, cnt.bbox.y + cnt.bbox.height/2);
                 cv.putText(overlay, text, pt, cv.FONT_ITALIC, 0.5, col, 2, 4);
 
@@ -234,7 +243,7 @@
              [orig, src, overlay].forEach(obj => obj.delete())
         }
 
-        function processContour(src, contour) {
+        function processContour(src, contour, setType) {
             let item = cutContour(src, contour, 1);
 
             let target = findContourAndFixPerspective2(item.mat);
@@ -246,20 +255,43 @@
                 return;
             }
 
-            let targetContours = getImportantContours(target.mat, 10, true);
-            let clusters = simpleClusterize(targetContours, 40);
+            // let targetContours = getImportantContours(target.mat, 10, true);
+            // let clusters = simpleClusterize(targetContours, 40);
 
-            cv.cvtColor(target.mat, target.mat, cv.COLOR_GRAY2RGB, 0);
+            // let edgeContours = getImportantContours(target.mat, 10, false, true);
 
-            clusters.forEach(cluster => {
-                let col = randColor();
-                cluster.forEach(cnt => {
-                    drawCnt(target.mat, cnt, col);
-                });
-            });
+            // cv.cvtColor(target.mat, target.mat, cv.COLOR_GRAY2RGB, 0);
+
+            // clusters.forEach(cluster => {
+            //     let col = randColor();
+            //     cluster.forEach(cnt => {
+            //         drawCnt(target.mat, cnt, col);
+            //     });
+            // });
+
+            // edgeContours.forEach(cnt => {
+            //     drawCnt(target.mat, cnt, randColor());
+            // });
+            //
+            //
+            // console.log('EDGE CNTS', edgeContours);
 
             let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
+            cutCanvas.classList.add('bestMatch');
             cv.imshow(cutCanvas, target.mat);
+
+            let slicer = new SetSlicer();
+
+            slicer.sliceSet(target.mat, setType).forEach(img => {
+                let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
+                cv.imshow(cutCanvas, img);
+
+                let tileContours = getImportantContours(img, 10, true);
+
+                let tile = cutTileFromContours(img, tileContours);
+
+                // cv.imshow(cutCanvas, tile.mat);
+            })
         }
 
         function processVideoFull(canvas) {

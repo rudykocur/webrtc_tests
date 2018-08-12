@@ -1,5 +1,22 @@
 
 
+
+function contourTouchEdge(cntBbox, srcSize) {
+    if(cntBbox.x === 0 || cntBbox.y === 0) {
+        return true;
+    }
+
+    if(cntBbox.x + cntBbox.width >= srcSize.width) {
+        return true;
+    }
+
+    if(cntBbox.y + cntBbox.height >= srcSize.height) {
+        return true;
+    }
+
+    return false;
+}
+
 function getImportantContours(src, minArea, skipEdges) {
     let srcSize = src.size();
 
@@ -14,18 +31,8 @@ function getImportantContours(src, minArea, skipEdges) {
         let cnt = contours.get(i);
         let cntBbox = cv.boundingRect(cnt);
 
-        if(skipEdges) {
-            if(cntBbox.x === 0 || cntBbox.y === 0) {
-                continue;
-            }
-
-            if(cntBbox.x + cntBbox.width >= srcSize.width) {
-                continue;
-            }
-
-            if(cntBbox.y + cntBbox.height >= srcSize.height) {
-                continue;
-            }
+        if(skipEdges && contourTouchEdge(cntBbox, srcSize)) {
+            continue
         }
 
         let cntArea = cv.contourArea(cnt);
@@ -132,42 +139,43 @@ function rotateImage(src, angle) {
     return dst;
 }
 
+function cutTileFromContours(src, contours, invertColors) {
+    let clusterBB = findClusterBB(contours, src.size());
+
+    let tmpTile = src.roi(clusterBB);
+    let tile = new cv.Mat();
+    tmpTile.copyTo(tile);
+
+    if(invertColors) {
+        cv.bitwise_not(tile, tile);
+    }
+
+    if(tile.size().width/tile.size().height > 1) {
+
+        console.log('ROTATING !!!');
+
+        let dst = new cv.Mat();
+        cv.transpose(tile, dst);
+        cv.flip(dst, dst,1);
+
+        return {
+            mat: dst,
+            bbox: clusterBB,
+        }
+    }
+
+    return {
+        mat: tile,
+        bbox: clusterBB,
+    };
+}
+
 
 function cutTilesFromClusters(src, clusters, invertColors) {
 
     invertColors = (typeof invertColors === "undefined") ? true : invertColors;
 
-    return clusters.map(cluster => {
-
-        let clusterBB = findClusterBB(cluster, src.size());
-
-        let tmpTile = src.roi(clusterBB);
-        let tile = new cv.Mat();
-        tmpTile.copyTo(tile);
-        
-        if(invertColors) {
-            cv.bitwise_not(tile, tile);
-        }
-        
-        if(tile.size().width/tile.size().height > 1) {
-
-            console.log('ROTATING !!!');
-
-            let dst = new cv.Mat();
-            cv.transpose(tile, dst);  
-            cv.flip(dst, dst,1); 
-
-            return {
-                mat: dst,
-                bbox: clusterBB,
-            }
-        }
-
-        return {
-            mat: tile,
-            bbox: clusterBB,
-        };
-    });
+    return clusters.map(cluster => cutTileFromContours(src, cluster, invertColors));
 }
 
 // function findContourAndFixPerspective(src) {
@@ -366,149 +374,4 @@ function flatten(src, corners, bbox, desiredHeight) {
   cv.warpPerspective(src, dst, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
 
   return dst;
-}
-
-class EventEmitter {
-    constructor() {
-        this._listeners = [];
-    }
-
-    addListener(callback) {
-        this._listeners.push(callback);
-    }
-
-    fire(...args) {
-        this._listeners.forEach(callback => callback(...args));
-    }
-}
-
-class ConstantVideoFeed {
-    constructor(filename) {
-        this.onFrame = new EventEmitter();
-
-        this.filename = filename;
-        this.canvas = document.createElement('canvas');
-        this.srcImg = document.createElement('img');
-        this.srcImg.classList.add('hidden');
-    }
-
-    getLastFrame() {
-        return this.canvas;
-    }
-
-    start() {
-        this.srcImg.src = this.filename;
-
-        this.srcImg.addEventListener('load', () => {
-            let src = cv.imread(this.srcImg);
-
-            cv.imshow(this.canvas, src);
-
-            console.log('IMAGE READY !!!');
-
-            this.onFrame.fire(this.canvas);
-        })
-    }
-
-    stop() {}
-}
-
-class VideoStreamFeed {
-    constructor(media, timeout) {
-        this.onFrame = new EventEmitter();
-
-        this.mediaDevices = media;
-        this.video = document.createElement('video');
-        this.canvas = document.createElement('canvas');
-
-        this.timeoutId = null;
-        this.timeout = timeout || 250;
-
-        this.resolution = {
-            width: { ideal: 640},
-            height: {ideal: 480 },
-            // width: {ideal: 1920, max: 1920},
-            // height: {ideal: 1080, max: 1440},
-        }
-    }
-
-    getLastFrame() {
-        return this.canvas;
-    }
-
-    start() {
-        console.log('Starting rear video feed with resolution', this.resolution);
-        this.findDeviceId().then(deviceId => {
-            const constraints = {
-                audio: false,
-                video: {
-                    width: this.resolution.width,
-                    height: this.resolution.height,
-                    facingMode: "environment"
-                }
-            };
-
-            this.mediaDevices.getUserMedia(constraints).then(s => this.onStreamOpened(s)).catch(e => {
-                console.log('FAILED', e);
-            });
-        })
-    }
-
-    stop() {
-        clearTimeout(this.timeoutId);
-
-        let stream = this.video.srcObject;
-        let tracks = stream.getTracks();
-
-        tracks.forEach(function (track) {
-            track.stop();
-        });
-
-        this.video.srcObject = null;
-    }
-
-    pollStream() {
-        this.canvas.width = this.video.videoWidth;
-        this.canvas.height = this.video.videoHeight;
-
-        if (this.video.videoWidth > 0 && this.video.videoHeight > 0) {
-            this.canvas.getContext('2d').drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
-
-            this.onFrame.fire(this.canvas);
-        }
-        else {
-            console.log('SKIP FRAME');
-        }
-
-        this.timeoutId = setTimeout(() => this.pollStream(), this.timeout);
-    }
-
-    onStreamOpened(stream) {
-
-        console.log('Starting streaming');
-
-        this.video.srcObject = stream;
-
-        this.video.play();
-
-        this.pollStream();
-    }
-
-    findDeviceId() {
-        return this.mediaDevices.enumerateDevices()
-            .then(function (devices) {
-                devices = devices.filter(d => d.kind === "videoinput");
-
-                let deviceId;
-
-                if (devices.length > 1) {
-                    deviceId = devices[1].deviceId;
-                }
-                else {
-                    deviceId = devices[0].deviceId;
-                }
-
-                return deviceId;
-            });
-    }
 }
