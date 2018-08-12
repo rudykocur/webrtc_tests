@@ -175,11 +175,11 @@
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_1750302.jpg');
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_175149.jpg');
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_1751492.jpg');
-        let feed = new ConstantVideoFeed('photos/IMG_20180811_164020.jpg');
+        // let feed = new ConstantVideoFeed('photos/IMG_20180811_164020.jpg');
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_190844.jpg');
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_192116.jpg');
         // let feed = new ConstantVideoFeed('images/source.jpg');
-        // let feed = new VideoStreamFeed(navigator.mediaDevices, 30);
+        let feed = new VideoStreamFeed(navigator.mediaDevices, 30);
 
         feed.onFrame.addListener(canvas => {
             let d1 = new Date();
