@@ -9,6 +9,7 @@
 
   <script src="libs/opencv.js"></script>
   <script src="functions.js"></script>
+  <script src="matcher.js"></script>
 
 <link rel="stylesheet" href="foundation.min.css">
 
@@ -22,7 +23,15 @@
         background: pink;
         margin: 5px;
     }
-  </style>
+
+    #cutSets > div {
+        display: inline-block;
+    }
+
+    #cutSets canvas.bestMatch {
+      display: block;
+      background: green;
+  }  </style>
 </head>
 <body>
 
@@ -43,11 +52,61 @@
 
     <button class="button primary large" id="captureStop">SHOT !</button> <span id="resolutionContainer">RESOLUTION</span> <span id="fpsCounter">FPS</span>
 
-
+    <div id="samples"></div>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
         console.log('READY', window.location.hash);
-            run(document.querySelector('video'));
+            let matcher = new TileMatcher(document.getElementById('samples'), 200);
+
+            let done = matcher.loadSamples([
+                {type: 'bamboo1', src: 'sample/bamboo-1.png'},
+                {type: 'bamboo2', src: 'sample/bamboo-2.png'},
+                {type: 'bamboo3', src: 'sample/bamboo-3.png'},
+                {type: 'bamboo4', src: 'sample/bamboo-4.png'},
+                {type: 'bamboo5', src: 'sample/bamboo-5.png'},
+                {type: 'bamboo6', src: 'sample/bamboo-6.png'},
+                {type: 'bamboo7', src: 'sample/bamboo-7.png'},
+                {type: 'bamboo8', src: 'sample/bamboo-8.png'},
+                {type: 'bamboo9', src: 'sample/bamboo-9.png'},
+                {type: 'bonus-autumn', src: 'sample/bonus-autumn.png'},
+                {type: 'bonus-spring', src: 'sample/bonus-sprint.png'},
+                {type: 'bonus-summer', src: 'sample/bonus-summer.png'},
+                {type: 'bonus-winter', src: 'sample/bonus-winter.png'},
+                {type: 'bonus-flower1', src: 'sample/bonus-flower1.png'},
+                {type: 'bonus-flower2', src: 'sample/bonus-flower2.png'},
+                {type: 'bonus-flower3', src: 'sample/bonus-flower3.png'},
+                {type: 'bonus-flower4', src: 'sample/bonus-flower4.png'},
+                {type: 'dragon-green', src: 'sample/dragon-green.png'},
+                {type: 'dragon-white', src: 'sample/dragon-white.png'},
+                {type: 'dragon-red', src: 'sample/dragon-red.png'},
+                {type: 'circle1', src: 'sample/circle-1.png'},
+                {type: 'circle2', src: 'sample/circle-2.png'},
+                {type: 'circle3', src: 'sample/circle-3.png'},
+                {type: 'circle4', src: 'sample/circle-4.png'},
+                {type: 'circle5', src: 'sample/circle-5.png'},
+                {type: 'circle6', src: 'sample/circle-6.png'},
+                {type: 'circle7', src: 'sample/circle-7.png'},
+                {type: 'circle8', src: 'sample/circle-8.png'},
+                {type: 'circle9', src: 'sample/circle-9.png'},
+                {type: 'number1', src: 'sample/number-1.png'},
+                {type: 'number2', src: 'sample/number-2.png'},
+                {type: 'number3', src: 'sample/number-3.png'},
+                {type: 'number4', src: 'sample/number-4.png'},
+                {type: 'number5', src: 'sample/number-5.png'},
+                {type: 'number6', src: 'sample/number-6.png'},
+                {type: 'number7', src: 'sample/number-7.png'},
+                {type: 'number8', src: 'sample/number-8.png'},
+                {type: 'number9', src: 'sample/number-9.png'},
+                {type: 'wind-east', src: 'sample/wind-east.png'},
+                {type: 'wind-north', src: 'sample/wind-north.png'},
+                {type: 'wind-south', src: 'sample/wind-south.png'},
+                {type: 'wind-west', src: 'sample/wind-west.png'},
+            ]);
+
+            done.then(() => {
+                run(matcher);
+            });
+
     });
 
     function randColor() {
@@ -55,15 +114,17 @@
                                       Math.round(Math.random() * 255));
     }
 
-    function run() {
+    /**
+     * @param {TileMatcher} matcher
+     */
+    function run(matcher) {
 
         let MIN_AREA = 5000;
-        let THRESHOLD = 150;
+        let THRESHOLD = 130;
 
         document.getElementById('captureStop').addEventListener('click', () => {
             let d1 = new Date();
             feed.stop();
-
 
             processVideoFull(feed.getLastFrame());
 
@@ -76,6 +137,15 @@
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_111404.jpg');
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_111439.jpg');
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_111458.jpg');
+
+        // let feed = new ConstantVideoFeed('photos/IMG_20180811_175030.jpg');
+        // let feed = new ConstantVideoFeed('photos/IMG_20180811_1750302.jpg');
+        // let feed = new ConstantVideoFeed('photos/IMG_20180811_175149.jpg');
+        // let feed = new ConstantVideoFeed('photos/IMG_20180811_1751492.jpg');
+        // let feed = new ConstantVideoFeed('photos/IMG_20180811_164020.jpg');
+        // let feed = new ConstantVideoFeed('photos/IMG_20180811_190844.jpg');
+        // let feed = new ConstantVideoFeed('photos/IMG_20180811_192116.jpg');
+        // let feed = new ConstantVideoFeed('images/source.jpg');
         let feed = new VideoStreamFeed(navigator.mediaDevices, 100);
 
         feed.onFrame.addListener(canvas => {
@@ -109,6 +179,10 @@
                 let col = randColor();
                 drawCnt(overlay, cnt, col);
                 drawBBRect(overlay, cnt.bbox, col);
+
+                let text = '' + (cnt.bbox.width / cnt.bbox.height);
+                let pt = new cv.Point(cnt.bbox.x + 20, cnt.bbox.y + cnt.bbox.height/2);
+                cv.putText(overlay, text, pt, cv.FONT_ITALIC, 0.5, col, 2, 4);
 
                 cnt.mat.delete();
             });
@@ -165,14 +239,49 @@
                     // }
 
                     let targetContours = getImportantContours(target.mat, 10, true);
-                    let clusters = simpleClusterize(targetContours, 80);
+                    let clusters = simpleClusterize(targetContours, 40);
                     // console.log('AAAA', targetContours);
                     // console.log('CLU', clusters);
+
+                    cv.cvtColor(target.mat, target.mat, cv.COLOR_GRAY2RGB, 0);
+
+                    clusters.forEach(cluster => {
+                        let col = randColor();
+                        cluster.forEach(cnt => {
+                            drawCnt(target.mat, cnt, col);
+                        });
+                    });
+
+                    let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
+                    cv.imshow(cutCanvas, target.mat);
+
+
+                    cv.cvtColor(target.mat, target.mat, cv.COLOR_RGB2GRAY, 0);
+
+
                     let tiles = cutTilesFromClusters(target.mat, clusters, false);
                     tiles.forEach(tile => {
 
                         let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
                         cv.imshow(cutCanvas, tile.mat);
+
+                        let matchResult = matcher.matchTile(tile.mat);
+
+                        let cutCanvas2 = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
+                        cutCanvas2.classList.add('bestMatch');
+                        cv.imshow(cutCanvas2, matchResult.bestMatch.diffImg);
+
+                        // matchResult.allMatches.forEach(match => {
+                        //     let div = document.getElementById('cutSets').appendChild(document.createElement('div'));
+                        //     let tmpCanvas = div.appendChild(document.createElement('canvas'));
+                        //     div.appendChild(document.createTextNode(match.score));
+                        // // cutCanvas2.classList.add('bestMatch');
+                        //     cv.imshow(tmpCanvas, match.diffImg);
+                        // })
+
+                        console.log(matchResult);
+
+                        matchResult.dispose();
                     })
                 }
                 finally {

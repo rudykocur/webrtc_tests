@@ -7,8 +7,6 @@ function getImportantContours(src, minArea, skipEdges) {
     let hierarchy = new cv.Mat();
     cv.findContours(src, contours, hierarchy, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE);
 
-    hierarchy.delete();
-
     let result = [];
 
     for (let i = 0; i < contours.size(); ++i) {
@@ -49,7 +47,8 @@ function getImportantContours(src, minArea, skipEdges) {
         });
     }
 
-    contours.delete();
+    hierarchy.delete();
+    // contours.delete();
 
     return result;
 }
@@ -134,22 +133,11 @@ function rotateImage(src, angle) {
 
 function cutTilesFromClusters(src, clusters, invertColors) {
 
-    // cv.cvtColor(src, src, cv.COLOR_GRAY2RGB, 0);
-
     invertColors = (typeof invertColors === "undefined") ? true : invertColors;
 
     return clusters.map(cluster => {
 
         let clusterBB = findClusterBB(cluster, src.size());
-
-        console.log("ROI CL", src.size(), '::', clusterBB, '::', cluster);
-        // let col = randColor();
-        //
-        // cluster.forEach(c => {
-        //     drawCnt(src, c, col);
-        // });
-        //
-        // drawBBRect(src, clusterBB, randColor());
 
         let tmpTile = src.roi(clusterBB);
         let tile = new cv.Mat();
@@ -159,43 +147,19 @@ function cutTilesFromClusters(src, clusters, invertColors) {
             cv.bitwise_not(tile, tile);
         }
         
-
-        // let M = cv.Mat.ones(5, 5, cv.CV_8U);
-        // You can try more different parameters
-        // cv.morphologyEx(tile, tile, cv.MORPH_CLOSE, M);
-
-        console.log('TILE BB', tile.size(), '::', tile.size().width/tile.size().height);
-
-
-
         if(tile.size().width/tile.size().height > 1) {
 
-            // cv.rotate(tile, tile, cv.ROTATE_90_CLOCKWISE);
             console.log('ROTATING !!!');
 
             let dst = new cv.Mat();
             cv.transpose(tile, dst);  
             cv.flip(dst, dst,1); 
 
-            // let dst = new cv.Mat();
-            // let dsize = new cv.Size(tile.rows, tile.cols);
-            // let center = new cv.Point(tile.rows / 2, tile.cols / 2);
-            // let M = cv.getRotationMatrix2D(center, 90, 1);
-            // cv.warpAffine(tile, dst, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
-            // tile = rotateImage(tile, 180);
-
             return {
                 mat: dst,
                 bbox: clusterBB,
             }
         }
-
-        
-
-        // let ksize = new cv.Size(3, 3);
-        // let anchor = new cv.Point(-1, -1);
-        // // You can try more different parameters
-        // cv.blur(tile, tile, ksize, anchor, cv.BORDER_DEFAULT);
 
         return {
             mat: tile,
@@ -204,28 +168,28 @@ function cutTilesFromClusters(src, clusters, invertColors) {
     });
 }
 
-function findContourAndFixPerspective(src) {
-    let important = getImportantContours(src, 2000);
-
-    important.sort((a, b) => b.area-a.area);
-    let biggest = important[0];
-    let bbox = cv.boundingRect(biggest.mat);
-
-    // cv.cvtColor(src, src, cv.COLOR_GRAY2RGB, 0);
-
-    drawBBRect(src, bbox, new cv.Scalar(0, 0, 0, 0));
-
-    let corners = getContourBBCorners(biggest.mat);
-
-    let m2 = new cv.Mat();
-    cv.approxPolyDP(biggest.mat,  m2, 500,true);
-
-    return {
-        mat: flatten(src, corners, bbox, 200),
-        contour: biggest.mat,
-        box: m2
-    }
-}
+// function findContourAndFixPerspective(src) {
+//     let important = getImportantContours(src, 2000);
+//
+//     important.sort((a, b) => b.area-a.area);
+//     let biggest = important[0];
+//     let bbox = cv.boundingRect(biggest.mat);
+//
+//     // cv.cvtColor(src, src, cv.COLOR_GRAY2RGB, 0);
+//
+//     drawBBRect(src, bbox, new cv.Scalar(0, 0, 0, 0));
+//
+//     let corners = getContourBBCorners(biggest.mat);
+//
+//     let m2 = new cv.Mat();
+//     cv.approxPolyDP(biggest.mat,  m2, 500,true);
+//
+//     return {
+//         mat: flatten(src, corners, bbox, 200),
+//         contour: biggest.mat,
+//         box: m2
+//     }
+// }
 
 function findApproxBbox(contour) {
     let epsilons = [500, 200, 150, 125, 110, 100, 75, 50];
@@ -288,9 +252,11 @@ function findClusterBB(contours, imageSize) {
     contours.forEach(c => {
         let cBB = cv.boundingRect(c.mat);
 
-        if(cBB.x + cBB.width > imageSize.width || cBB.y + cBB.height > imageSize.height) {
-            return;
-        } 
+        if(imageSize) {
+            if (cBB.x + cBB.width > imageSize.width || cBB.y + cBB.height > imageSize.height) {
+                return;
+            }
+        }
 
         if(cBB.x < x1) {
             x1 = cBB.x;
@@ -334,12 +300,32 @@ function simpleClusterize(contours, maxDistance, skipIndex) {
             return;
         }
 
-        let avgX = currentCluster.reduce((total, c) => total + c.center.x, 0) / currentCluster.length;
+        let cntToTest;
+        if(currentCluster.length > 1) {
+            cntToTest = [currentCluster[0], currentCluster[currentCluster.length - 1]];
+        }
+        else {
+            cntToTest = currentCluster;
+        }
 
-        if(Math.abs(cnt.center.x - avgX) < maxDistance) {
+        let sorted = currentCluster.slice().sort((a, b) => (a.bbox.x+a.bbox.width) - (b.bbox.x+b.bbox.width));
+        let rightmost = sorted[sorted.length-1];
+        let avgX = rightmost.bbox.x + rightmost.bbox.width;
+
+        let clusterBB = findClusterBB(currentCluster);
+        let clusterBBRatio = clusterBB.width / clusterBB.height;
+        let isRectangle = clusterBBRatio > 0.85 && clusterBBRatio < 1.15;
+        isRectangle = false;
+
+        // let avgX = cntToTest.reduce((total, c) => total + c.center.x, 0) / cntToTest.length;
+        // let avgX = currentCluster[currentCluster.length - 1].center.x;
+
+        // if(Math.abs(cnt.center.x - avgX) < maxDistance) {
+        if((cnt.center.x - avgX) < maxDistance || isRectangle) {
             currentCluster.push(cnt);
         }
         else {
+            console.log('BREAK CLUSTER. BBOX RATIO', clusterBB.width / clusterBB.height);
             result.push(currentCluster);
             currentCluster = [cnt];
         }
