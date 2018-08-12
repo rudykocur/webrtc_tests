@@ -60,22 +60,16 @@ function getImportantContours(src, minArea, skipEdges) {
     return result;
 }
 
-function cutContour(src, contour, upscale) {
-    let SCALE = upscale || 1;
+function cutContour(src, contour) {
     let hullBB = cv.boundingRect(contour.mat);
 
-    let cutRect = new cv.Rect(
-      hullBB.x * SCALE, hullBB.y * SCALE,
-      (hullBB.width) * SCALE, (hullBB.height) * SCALE
-    );
-
-    if(cutRect.x + cutRect.width > src.cols) {
-        console.log('SKIPPING CUT CONTOURS', cutRect.x + cutRect.width, '::', src.rows)
+    if(hullBB.x + hullBB.width > src.cols) {
+        console.log('SKIPPING CUT CONTOURS', cutRect.x + cutRect.width, '::', src.rows);
       return;
     }
 
     return {
-        mat: src.roi(cutRect),
+        mat: src.roi(hullBB),
         cnt: contour.mat,
     };
 }
@@ -85,13 +79,6 @@ function cutContours(src, contours, upscale) {
     return contours.map(cnt => cutContour(src, cnt, upscale)).filter(c => c);
 }
 
-
-// function getContourBBCorners(bbox) {
-//     let m2 = new cv.Mat();
-//     cv.approxPolyDP(contour, m2, 100,true);
-//
-//     return getBbox(m2);
-// }
 
 function getBbox(mat) {
     let points = [];
@@ -177,29 +164,6 @@ function cutTilesFromClusters(src, clusters, invertColors) {
 
     return clusters.map(cluster => cutTileFromContours(src, cluster, invertColors));
 }
-
-// function findContourAndFixPerspective(src) {
-//     let important = getImportantContours(src, 2000);
-//
-//     important.sort((a, b) => b.area-a.area);
-//     let biggest = important[0];
-//     let bbox = cv.boundingRect(biggest.mat);
-//
-//     // cv.cvtColor(src, src, cv.COLOR_GRAY2RGB, 0);
-//
-//     drawBBRect(src, bbox, new cv.Scalar(0, 0, 0, 0));
-//
-//     let corners = getContourBBCorners(biggest.mat);
-//
-//     let m2 = new cv.Mat();
-//     cv.approxPolyDP(biggest.mat,  m2, 500,true);
-//
-//     return {
-//         mat: flatten(src, corners, bbox, 200),
-//         contour: biggest.mat,
-//         box: m2
-//     }
-// }
 
 function findApproxBbox(contour) {
     let epsilons = [500, 200, 150, 125, 110, 100, 75, 50];

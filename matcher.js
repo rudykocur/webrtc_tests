@@ -56,7 +56,7 @@ class TileMatcher {
 
         let result = new MatchResults();
 
-        let rotated = rotateImage(tileToMatch, 180);
+        let rotated = this._rotateImage(tileToMatch, 180);
 
         let tiles = [tileToMatch, rotated];
 
@@ -79,6 +79,19 @@ class TileMatcher {
         rotated.delete();
 
         return result;
+    }
+
+    _rotateImage(src, angle) {
+        let dst = new cv.Mat();
+        let dsize = new cv.Size(src.cols, src.rows);
+        let center = new cv.Point(src.cols / 2, src.rows / 2);
+
+        let M = cv.getRotationMatrix2D(center, angle, 1);
+        cv.warpAffine(src, dst, M, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
+
+        M.delete();
+
+        return dst;
     }
 
     _scaleToTarget(src) {

@@ -8,10 +8,10 @@
   <title>capture</title>
 
   <script src="libs/opencv.js"></script>
-  <script src="functions.js"></script>
   <script src="feed.js"></script>
   <script src="matcher.js"></script>
   <script src="slicer.js"></script>
+  <script src="finder.js"></script>
 
 <link rel="stylesheet" href="foundation.min.css">
 
@@ -58,21 +58,19 @@
 </head>
 <body>
 
-  <div class="demo-frame">
+<div class="demo-frame">
     <div class="demo-container">
-      <!--<img id="image" src="./tile1.png">-->
-      <!--<img id="input" src="./tile9.png">-->
-      <!--<img id="image2" src="./tile1.png">-->
-      <div id="videoPreview" style="position: relative">
-      <canvas id="canvasOutput0" width="600" height="300" style="opacity: 1"></canvas>
-      <canvas id="canvasOutputOverlay" width="600" height="300" style="position: absolute; top: 0; left:0; opacity: 0.6"></canvas>
-      </div>
-      <div id="cutSets"></div>
-      <canvas id="canvasOutput" width="600" height="300" style="display: none"></canvas>
+        <div id="videoPreview" style="position: relative">
+            <canvas id="canvasOutput0" width="600" height="300" style="opacity: 1"></canvas>
+            <canvas id="canvasOutputOverlay" width="600" height="300"
+                    style="position: absolute; top: 0; left:0; opacity: 0.6"></canvas>
+        </div>
+        <div id="cutSets"></div>
+        <canvas id="canvasOutput" width="600" height="300" style="display: none"></canvas>
     </div>
-  </div>
+</div>
 
-    <button class="button primary large" id="captureStop">SHOT !</button> <span id="resolutionContainer">RESOLUTION</span> <span id="fpsCounter">FPS</span>
+    <button class="button primary large" id="captureStop">Stop</button> <span id="resolutionContainer">RESOLUTION</span> <span id="fpsCounter">FPS</span>
 
     <div id="samples" style="position: absolute; top: -1000px; left: -1000px"></div>
   <script>
@@ -131,11 +129,6 @@
 
     });
 
-    function randColor() {
-        return new cv.Scalar(Math.round(Math.random() * 255), Math.round(Math.random() * 255),
-                                      Math.round(Math.random() * 255));
-    }
-
     const SET_TYPE_PUNG = 'Pung';
     const SET_TYPE_KONG = 'Kong';
 
@@ -156,14 +149,7 @@
         let THRESHOLD = 120;
 
         document.getElementById('captureStop').addEventListener('click', () => {
-            // let d1 = new Date();
             feed.stop();
-
-            // processVideoFull(feed.getLastFrame());
-            //
-            // let d2 = new Date();
-            //
-            // document.getElementById('fpsCounter').innerText = 'Full process time: ' + (d2-d1) + ' ms';
         });
         
         let feed;
@@ -217,96 +203,61 @@
 
         function processVideoFast(canvas) {
 
-            let orig = cv.imread(canvas);
-            let src = new cv.Mat();
+            let finder = new TileFinder(THRESHOLD, MIN_AREA);
 
-            document.getElementById('resolutionContainer').innerHTML = `${orig.size().width} x ${orig.size().height}`;
+            let result = finder.findTiles(canvas);
 
-            cv.cvtColor(orig, src, cv.COLOR_RGBA2GRAY, 0);
-            cv.threshold(src, src, THRESHOLD, 255, cv.THRESH_BINARY);
+            let overlay = cv.Mat.ones(result.source.rows, result.source.cols, cv.CV_8UC3);
 
-            let overlay = cv.Mat.ones(src.rows, src.cols, cv.CV_8UC3);
+            result.tiles.forEach(tile => {
+                let col = finder.randColor();
 
-            let contours = getImportantContours(src, MIN_AREA);
-
-            contours.forEach(cnt => {
-                let col = randColor();
-
-                let bbRatio = cnt.bbox.width / cnt.bbox.height;
+                let bbRatio = tile.bbox.width / tile.bbox.height;
                 let setType = getSetTypeFromRatio(bbRatio);
 
-                if(captureRectPosition && positionInBbox(captureRectPosition, cnt.bbox)) {
-                    processContour(src, cnt, setType, matcher);
-                    captureRectPosition = null;
+                if(captureRectPosition && positionInBbox(captureRectPosition, tile.bbox)) {
+                    try {
+                        processContour(finder, result, tile, setType, matcher);
+                    }
+                    finally {
+                        captureRectPosition = null;
+                    }
                 }
 
-                drawCnt(overlay, cnt, col);
-                drawBBRect(overlay, cnt.bbox, col);
-
-
+                finder.drawCnt(overlay, tile, col);
+                finder.drawBBRect(overlay, tile.bbox, col);
 
                 let text = setType + ' ' + (Math.round(bbRatio * 1000) / 1000);
-                let pt = new cv.Point(cnt.bbox.x + 20, cnt.bbox.y + cnt.bbox.height/2);
+                let pt = new cv.Point(tile.bbox.x + 20, tile.bbox.y + tile.bbox.height/2);
                 cv.putText(overlay, text, pt, cv.FONT_ITALIC, 0.5, col, 2, 4);
-
-                cnt.mat.delete();
             });
 
-             cv.imshow('canvasOutput0', orig);
+             cv.imshow('canvasOutput0', result.original);
              cv.imshow('canvasOutputOverlay', overlay);
 
-             [orig, src, overlay].forEach(obj => obj.delete())
+             [overlay].forEach(obj => obj.delete());
+
+            finder.dispose();
         }
 
-        function processContour(src, contour, setType, matcher) {
-            let item = cutContour(src, contour, 1);
+        /**
+         *
+         * @param {TileFinder} finder
+         * @param result
+         * @param tile
+         * @param setType
+         * @param matcher
+         */
+        function processContour(finder, result, tile, setType, matcher) {
 
-            let target = findContourAndFixPerspective2(item.mat);
-
-            if(!target) {
-                let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
-                cv.imshow(cutCanvas, item.mat);
-                console.warn('NO TARGET FOR', item);
-                return;
-            }
-
-            // let targetContours = getImportantContours(target.mat, 10, true);
-            // let clusters = simpleClusterize(targetContours, 40);
-
-            // let edgeContours = getImportantContours(target.mat, 10, false, true);
-
-            // cv.cvtColor(target.mat, target.mat, cv.COLOR_GRAY2RGB, 0);
-
-            // clusters.forEach(cluster => {
-            //     let col = randColor();
-            //     cluster.forEach(cnt => {
-            //         drawCnt(target.mat, cnt, col);
-            //     });
-            // });
-
-            // edgeContours.forEach(cnt => {
-            //     drawCnt(target.mat, cnt, randColor());
-            // });
-            //
-            //
-            // console.log('EDGE CNTS', edgeContours);
+            let tilesetResult = finder.getTilesFromSet(result.source, tile, setType);
 
             let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
             cutCanvas.classList.add('bestMatch');
-            cv.imshow(cutCanvas, target.mat);
+            cv.imshow(cutCanvas, tilesetResult.source.mat);
 
-            let slicer = new SetSlicer();
-
-            slicer.sliceSet(target.mat, setType).forEach(img => {
+            tilesetResult.tiles.forEach(tile => {
                 let row = document.getElementById('cutSets').appendChild(document.createElement('div'))
-
-                // cv.imshow(cutCanvas, img);
-
-                let tileContours = getImportantContours(img, 10, true);
-
-                let tile = cutTileFromContours(img, tileContours);
-
-                // cv.imshow(cutCanvas, tile.mat);
 
                 let matchResult = matcher.matchTile(tile.mat);
 
@@ -319,114 +270,6 @@
                 matchResult.dispose();
             })
         }
-
-        function processVideoFull(canvas) {
-            let orig = cv.imread(canvas);
-            let src = new cv.Mat();
-
-            document.getElementById('resolutionContainer').innerHTML = `${orig.size().width} x ${orig.size().height}`;
-
-            let SCALE = 1.0;
-
-            cv.cvtColor(orig, src, cv.COLOR_RGBA2GRAY, 0);
-            cv.threshold(src, src, THRESHOLD, 255, cv.THRESH_BINARY);
-
-            let overlay = cv.Mat.ones(src.rows, src.cols, cv.CV_8UC3);
-
-            let contours = getImportantContours(src, MIN_AREA);
-
-            contours.forEach(cnt => {
-                drawCnt(overlay, cnt);
-            });
-
-            console.info('ALL CONTOURS', contours);
-
-            cv.imshow('canvasOutput0', src);
-            cv.imshow('canvasOutputOverlay', overlay);
-
-            cutContours(src, contours, SCALE).slice(0).forEach(item => { // .slice(22)
-
-                let target;
-
-                try {
-
-                    // try {
-                        target = findContourAndFixPerspective2(item.mat);
-
-                        if(!target) {
-                            let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
-                            cv.imshow(cutCanvas, item.mat);
-                            console.warn('NO TARGET FOR', item);
-                            return;
-                        }
-                    // }
-                    // catch (e) {
-                    //     console.error("FAILED TO FIND PERSPECTIVE");
-                    //     return;
-                    // }
-
-                    let targetContours = getImportantContours(target.mat, 10, true);
-                    let clusters = simpleClusterize(targetContours, 40);
-                    // console.log('AAAA', targetContours);
-                    // console.log('CLU', clusters);
-
-                    cv.cvtColor(target.mat, target.mat, cv.COLOR_GRAY2RGB, 0);
-
-                    clusters.forEach(cluster => {
-                        let col = randColor();
-                        cluster.forEach(cnt => {
-                            drawCnt(target.mat, cnt, col);
-                        });
-                    });
-
-                    let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
-                    cv.imshow(cutCanvas, target.mat);
-
-
-                    cv.cvtColor(target.mat, target.mat, cv.COLOR_RGB2GRAY, 0);
-
-
-                    let tiles = cutTilesFromClusters(target.mat, clusters, false);
-                    tiles.forEach(tile => {
-
-                        let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
-                        cv.imshow(cutCanvas, tile.mat);
-
-                        let matchResult = matcher.matchTile(tile.mat);
-
-                        let cutCanvas2 = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
-                        cutCanvas2.classList.add('bestMatch');
-                        cv.imshow(cutCanvas2, matchResult.bestMatch.diffImg);
-
-                        // matchResult.allMatches.forEach(match => {
-                        //     let div = document.getElementById('cutSets').appendChild(document.createElement('div'));
-                        //     let tmpCanvas = div.appendChild(document.createElement('canvas'));
-                        //     div.appendChild(document.createTextNode(match.score));
-                        // // cutCanvas2.classList.add('bestMatch');
-                        //     cv.imshow(tmpCanvas, match.diffImg);
-                        // })
-
-                        console.log(matchResult);
-
-                        matchResult.dispose();
-                    })
-                }
-                finally {
-                    if(target){
-                        // let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
-                        // cv.imshow(cutCanvas, target.mat);
-                    }
-                    // cv.imshow(cutCanvas, item.mat);
-                    // throw e;
-                }
-
-
-            });
-
-
-
-        }
-        
 
     }
 
