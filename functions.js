@@ -53,27 +53,29 @@ function getImportantContours(src, minArea, skipEdges) {
     return result;
 }
 
+function cutContour(src, contour, upscale) {
+    let SCALE = upscale || 1;
+    let hullBB = cv.boundingRect(contour.mat);
+
+    let cutRect = new cv.Rect(
+      hullBB.x * SCALE, hullBB.y * SCALE,
+      (hullBB.width) * SCALE, (hullBB.height) * SCALE
+    );
+
+    if(cutRect.x + cutRect.width > src.cols) {
+        console.log('SKIPPING CUT CONTOURS', cutRect.x + cutRect.width, '::', src.rows)
+      return;
+    }
+
+    return {
+        mat: src.roi(cutRect),
+        cnt: contour.mat,
+    };
+}
+
 
 function cutContours(src, contours, upscale) {
-    let SCALE = upscale || 1;
-    return contours.map(cnt => {
-        let hullBB = cv.boundingRect(cnt.mat);
-
-        let cutRect = new cv.Rect(
-          hullBB.x * SCALE, hullBB.y * SCALE,
-          (hullBB.width) * SCALE, (hullBB.height) * SCALE
-        );
-
-        if(cutRect.x + cutRect.width > src.cols) {
-            console.log('SKIPPING CUT CONTOURS', cutRect.x + cutRect.width, '::', src.rows)
-          return;
-        }
-
-        return {
-            mat: src.roi(cutRect),
-            cnt: cnt.mat,
-        };
-      }).filter(c => c);
+    return contours.map(cnt => cutContour(src, cnt, upscale)).filter(c => c);
 }
 
 

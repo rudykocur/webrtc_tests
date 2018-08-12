@@ -162,7 +162,7 @@
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_190844.jpg');
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_192116.jpg');
         // let feed = new ConstantVideoFeed('images/source.jpg');
-        let feed = new VideoStreamFeed(navigator.mediaDevices, 100);
+        let feed = new VideoStreamFeed(navigator.mediaDevices, 5);
 
         feed.onFrame.addListener(canvas => {
             let d1 = new Date();
@@ -176,6 +176,23 @@
         });
 
         feed.start();
+
+        let captureRectPosition = null;
+
+        let canva = document.getElementById('canvasOutputOverlay');
+        canva.addEventListener('click', e => {
+
+            captureRectPosition = {
+                x: e.pageX - canva.offsetLeft,
+                y: e.pageY - canva.offsetTop
+            };
+
+            console.log('CLICK', captureRectPosition);
+        });
+
+        function positionInBbox(pos, bbox) {
+            return pos.x >= bbox.x && pos.x <= bbox.x + bbox.width && pos.y >= bbox.y && pos.y <= bbox.y + bbox.height;
+        }
 
         function processVideoFast(canvas) {
 
@@ -193,6 +210,12 @@
 
             contours.forEach(cnt => {
                 let col = randColor();
+
+                if(captureRectPosition && positionInBbox(captureRectPosition, cnt.bbox)) {
+                    processContour(src, cnt);
+                    captureRectPosition = null;
+                }
+
                 drawCnt(overlay, cnt, col);
                 drawBBRect(overlay, cnt.bbox, col);
 
@@ -209,6 +232,34 @@
              cv.imshow('canvasOutputOverlay', overlay);
 
              [orig, src, overlay].forEach(obj => obj.delete())
+        }
+
+        function processContour(src, contour) {
+            let item = cutContour(src, contour, 1);
+
+            let target = findContourAndFixPerspective2(item.mat);
+
+            if(!target) {
+                let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
+                cv.imshow(cutCanvas, item.mat);
+                console.warn('NO TARGET FOR', item);
+                return;
+            }
+
+            let targetContours = getImportantContours(target.mat, 10, true);
+            let clusters = simpleClusterize(targetContours, 40);
+
+            cv.cvtColor(target.mat, target.mat, cv.COLOR_GRAY2RGB, 0);
+
+            clusters.forEach(cluster => {
+                let col = randColor();
+                cluster.forEach(cnt => {
+                    drawCnt(target.mat, cnt, col);
+                });
+            });
+
+            let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
+            cv.imshow(cutCanvas, target.mat);
         }
 
         function processVideoFull(canvas) {
