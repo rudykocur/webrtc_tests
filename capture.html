@@ -114,13 +114,29 @@
                                       Math.round(Math.random() * 255));
     }
 
+    function getSetTypeFromRatio(ratio) {
+        if(ratio < 2.2) {
+            return 'Con. Pung';
+        }
+
+        if(ratio < 2.5) {
+            return 'Rev. Pung';
+        }
+
+        if(ratio < 2.9) {
+            return 'Con. Kong'
+        }
+
+        return 'Rev. Kong';
+    }
+
     /**
      * @param {TileMatcher} matcher
      */
     function run(matcher) {
 
         let MIN_AREA = 5000;
-        let THRESHOLD = 130;
+        let THRESHOLD = 150;
 
         document.getElementById('captureStop').addEventListener('click', () => {
             let d1 = new Date();
@@ -180,7 +196,9 @@
                 drawCnt(overlay, cnt, col);
                 drawBBRect(overlay, cnt.bbox, col);
 
-                let text = '' + (cnt.bbox.width / cnt.bbox.height);
+                let bbRatio = cnt.bbox.width / cnt.bbox.height;
+
+                let text = getSetTypeFromRatio(bbRatio) + ' ' + (Math.round(bbRatio * 1000) / 1000);
                 let pt = new cv.Point(cnt.bbox.x + 20, cnt.bbox.y + cnt.bbox.height/2);
                 cv.putText(overlay, text, pt, cv.FONT_ITALIC, 0.5, col, 2, 4);
 
