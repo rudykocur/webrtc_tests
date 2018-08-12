@@ -28,6 +28,17 @@
 
     #cutSets > div {
         display: inline-block;
+        margin 0 5px;
+    }
+
+    #cutSets > div span {
+        display: block;
+        background: pink;
+        text-align: center;
+    }
+
+    #cutSets > div canvas {
+        margin: 0;
     }
 
     #cutSets canvas.bestMatch {
@@ -164,11 +175,11 @@
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_1750302.jpg');
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_175149.jpg');
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_1751492.jpg');
-        // let feed = new ConstantVideoFeed('photos/IMG_20180811_164020.jpg');
+        let feed = new ConstantVideoFeed('photos/IMG_20180811_164020.jpg');
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_190844.jpg');
         // let feed = new ConstantVideoFeed('photos/IMG_20180811_192116.jpg');
         // let feed = new ConstantVideoFeed('images/source.jpg');
-        let feed = new VideoStreamFeed(navigator.mediaDevices, 30);
+        // let feed = new VideoStreamFeed(navigator.mediaDevices, 30);
 
         feed.onFrame.addListener(canvas => {
             let d1 = new Date();
@@ -283,7 +294,8 @@
             let slicer = new SetSlicer();
 
             slicer.sliceSet(target.mat, setType).forEach(img => {
-                let cutCanvas = document.getElementById('cutSets').appendChild(document.createElement('canvas'));
+                let row = document.getElementById('cutSets').appendChild(document.createElement('div'))
+
                 // cv.imshow(cutCanvas, img);
 
                 let tileContours = getImportantContours(img, 10, true);
@@ -294,7 +306,11 @@
 
                 let matchResult = matcher.matchTile(tile.mat);
 
-                cv.imshow(cutCanvas2, matchResult.bestMatch.diffImg);
+                row.appendChild(document.createElement('span')).innerText =
+                    matchResult.bestMatch.type + ' (' + (100-Math.round(matchResult.bestMatch.score*100)) + '%)';
+
+                let cutCanvas = row.appendChild(document.createElement('canvas'));
+                cv.imshow(cutCanvas, matchResult.bestMatch.diffImg);
 
                 matchResult.dispose();
             })
